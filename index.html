@@ -174,6 +174,8 @@ td .sub{font-size:12px;color:var(--muted)}
 .login-bg{position:fixed;inset:0;z-index:100;background:var(--bg);display:grid;place-items:center;padding:16px}
 .login-bg[hidden]{display:none}
 .login{width:min(380px,100%);background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:24px;display:grid;gap:12px;box-shadow:0 10px 30px rgba(0,0,0,.08)}
+table.vtm td{vertical-align:top}table.vtm .in.small{font-size:12.5px;padding:4px 6px}table.vtm textarea.edited{border-color:var(--warn);background:var(--warn-soft)}
+table.vtm tr.grp td{background:var(--accent-soft);color:var(--accent);position:sticky;left:0}
 textarea.vtspec{min-height:38px;resize:vertical;font-size:12.5px;line-height:1.35;white-space:pre-wrap}
 .ppick{display:flex;flex-wrap:wrap;gap:6px;align-items:center;border:1px solid var(--line);border-radius:var(--r);padding:6px;background:var(--surface);min-height:38px}
 .pchip{display:inline-flex;align-items:center;gap:4px;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:2px 4px 2px 10px;font-size:13px;font-weight:500}
@@ -262,6 +264,7 @@ textarea.in{min-height:56px;resize:vertical}
   <div class="brand"><b>Bảng khối lượng sửa chữa tiểu tu</b><span>Nhiệt điện Nghi Sơn · ĐMSCL 300MW</span></div>
   <nav class="tabs" role="tablist">
     <button class="tab" role="tab" data-tab="phuong-an">Đợt sửa chữa</button>
+    <button class="tab" role="tab" data-tab="vat-tu">Rà soát vật tư</button>
     <button class="tab" role="tab" data-tab="doi-chieu">Đối chiếu định mức</button>
     <button class="tab" role="tab" data-tab="dinh-muc">Định mức</button>
     <button class="tab" role="tab" data-tab="ton-kho">Tồn kho</button>
@@ -640,6 +643,7 @@ function render() {
   { const dl = document.getElementById('ptlist-all'); const p0 = curP(); if (dl && p0) dl.innerHTML = PT_ROLES.flatMap(([f]) => p0.items.flatMap(i => ptList(i[f]))).filter((x, i, a) => a.indexOf(x) === i).map(n => `<option value="${esc(n)}">`).join(''); }
   const m = $('#main');
   if (S.tab === 'phuong-an') m.innerHTML = viewPA();
+  else if (S.tab === 'vat-tu') m.innerHTML = viewVTM();
   else if (S.tab === 'doi-chieu') m.innerHTML = viewCmp() + modalsHTML(curP());
   else if (S.tab === 'dinh-muc') m.innerHTML = viewDM() + modalsHTML(curP());
   else m.innerHTML = viewInv() + modalsHTML(curP());
@@ -762,6 +766,7 @@ function personSelect(p, id = 'ptsel') {
 }
 function viewHome() {
   const cards = S.projects.map(p => {
+    if (p.kind === 'vt') { const n = (p.mats || []).length; const tien = (p.mats || []).reduce((a, m) => a + evalKL(m.qty) * (Number(m.dg) || 0), 0); return `<button class="pcard" data-act="openp" data-id="${p.id}"><span class="eyebrow">Danh mục vật tư · ${esc(p.year || '')}</span><b class="pc-name">${esc(p.name)}</b><span class="pc-stats"><span><b>${fmt(n, 0)}</b> dòng vật tư</span><span><b>${fmt(tien / 1e9, 2)}</b> tỷ đ</span><span><b>${uniq((p.mats || []).map(m => m.bieu)).length}</b> biểu</span></span><span class="small muted">Rà soát thông số, đối chiếu tồn kho, không có nhân công</span><span class="small muted">${p.updated ? 'Cập nhật ' + tfmt(p.updated) + (p.updatedBy ? ' · ' + esc(p.updatedBy) : '') : ''}</span></button>`; }
     const { t, persons } = projStatsBy(p, '');
     const T = buildTree(p);
     return `<button class="pcard" data-act="openp" data-id="${p.id}">
@@ -867,10 +872,10 @@ function modalsHTML(p) {
     const sh = S.cmp?.sheets?.[S.cmpSheet];
     h += `<div class="modal-bg"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="ch"><h2 id="ch" style="font-size:16px">Chuyển "${esc(sh?.name || '')}" thành đợt sửa chữa</h2>
       <label class="opt"><input type="radio" name="convm" value="new" checked><b>Tạo đợt sửa chữa mới</b><span>Giữ nguyên các đợt đang có.</span></label>
-      ${S.projects.filter(x => !x.sample).length ? `<label class="opt"><input type="radio" name="convm" value="replace"><b>Đưa vào đợt (thay toàn bộ hạng mục của đợt)</b><span>Dùng cho lần nhập đầu tiên, hoặc làm lại từ đầu. Hạng mục đã nộp / đã duyệt không bị xoá.</span></label>
+      ${S.projects.filter(x => !x.sample && x.kind !== 'vt').length ? `<label class="opt"><input type="radio" name="convm" value="replace"><b>Đưa vào đợt (thay toàn bộ hạng mục của đợt)</b><span>Dùng cho lần nhập đầu tiên, hoặc làm lại từ đầu. Hạng mục đã nộp / đã duyệt không bị xoá.</span></label>
       <label class="opt"><input type="radio" name="convm" value="append"><b>Thêm vào cuối đợt</b><span>Giữ hạng mục đang có, thêm các dòng của sheet này (ví dụ mỗi phân xưởng nhập phần của mình).</span></label>
       <label class="opt"><input type="radio" name="convm" value="pt"><b>Chỉ bổ sung phụ trách / đơn vị vào đợt đã có</b><span>Không thêm dòng, không đổi số liệu; chỉ điền người phụ trách (P4, PX chủ quản, PX sửa chữa) và ĐV chủ quản / sửa chữa cho các dòng trùng STT và mã định mức.</span></label>
-      <label class="fl"><span>Đợt áp dụng (khi không tạo đợt mới)</span><select class="in" id="convp">${S.projects.filter(x => !x.sample).map(x => `<option value="${x.id}" ${fold(x.unit).replace(/\D/g, '') && fold(sh?.name || '').replace(/\D/g, '').includes(fold(x.unit).replace(/\D/g, '')) ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></label>
+      <label class="fl"><span>Đợt áp dụng (khi không tạo đợt mới)</span><select class="in" id="convp">${S.projects.filter(x => !x.sample && x.kind !== 'vt').map(x => `<option value="${x.id}" ${fold(x.unit).replace(/\D/g, '') && fold(sh?.name || '').replace(/\D/g, '').includes(fold(x.unit).replace(/\D/g, '')) ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></label>
       ` : ''}<div class="fgrid"><label class="fl c3"><span>ĐV chủ quản (cho dòng file không ghi)</span>${pxSel('convcq', 'PX1')}</label>
         <label class="fl c3"><span>ĐV sửa chữa (cho dòng file không ghi)</span>${pxSel('convsc', 'PX2')}</label></div>
       <div class="btns"><button class="btn pri" data-act="doconv">Thực hiện</button><button class="btn" data-act="convclose">Huỷ</button></div></div></div>`;
@@ -910,6 +915,7 @@ function viewPA() {
       <label style="display:flex;gap:8px;align-items:center;padding-left:4px"><input type="checkbox" id="expc" ${S.expCong ? 'checked' : ''}> Với biểu mẫu gộp: thêm 4 cột số công (ĐM, chiết giảm n, tỷ lệ, tổng công) bên phải cột Ghi chú</label>
       <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="expx" ${S.expExtra !== false ? 'checked' : ''}> Kèm sheet Tổng hợp chiết giảm và Hiện trạng</label>
       ${filterOn() ? `<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="expf" checked> Chỉ xuất phần đang chọn: <b>${esc(filterLabel(p))}</b></label>` : ''}
+      ${expSysHTML(p)}
       <div class="btns"><button class="btn pri" data-act="doexport">Xuất file</button><button class="btn" data-act="expclose">Huỷ</button></div></div></div>` : '';
   const nodeIt = S.node ? p.items.find(i => i.id === S.node) : null;
   const parentIt = nodeIt && lvlOf(nodeIt.stt) === 2 ? p.items.find(i => i.id === (T.pathOf[nodeIt.id] || [])[0] && i.id !== nodeIt.id) : null;
@@ -1449,6 +1455,232 @@ function viewInv() {
     ${S.invQ ? `<div class="tw"><table><thead><tr><th>Mã VT</th><th>Tên vật tư</th><th>ĐVT</th><th class="num">Tồn cuối</th><th class="num">Đơn giá BQ</th><th>Theo kho</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="muted">Không tìm thấy</td></tr>'}</tbody></table></div>` : '<div class="empty small">Gõ để tìm vật tư</div>'}</section></div>`;
 }
 
+/* ================= MODULE RÀ SOÁT VẬT TƯ =================
+   - Danh mục vật tư kế hoạch (biểu PL1: B4.1.2a.6.3 Mỡ, B4.1.2b VT thay thế / CNTT, B4.1.2c VT tiêu hao, B4.1.2d CCDC, hoặc file đã gộp 1 sheet):
+     không có nhân công; rà thông số kỹ thuật, cập nhật để mời thầu, đối chiếu tồn kho.
+   - Vật tư của các đợt tiểu tu: sửa trực tiếp từng dòng vật tư của hạng mục (vẫn gắn với hạng mục để xuất phương án). */
+const VTM_ST = { moi: 'Mua mới', thieu: 'Thiếu', du: 'Đủ tồn', ngoai: 'Ngoài danh mục', na: 'Chưa nạp tồn kho' };
+const VTM_F = { vtcode: 'Mã vật tư', vtname: 'Tên vật tư', spec: 'Thông số kỹ thuật', mahieu: 'Mã hiệu / hãng SX', xx: 'Xuất xứ', unit: 'ĐVT', qty: 'Khối lượng', dg: 'Đơn giá', gc: 'Ghi chú' };
+Object.assign(F_LABEL, VTM_F);
+function vtmProj() { const p = S.projects.find(x => x.id === S.vtP) || curP() || S.projects[0] || null; if (p) S.vtP = p.id; return p; }
+function parseVTPlanSheet(ws, sn) {
+  const cells = sheetCells(ws);
+  const [hi, H] = findHeader(cells, t => t.some(x => x.includes('ma vat tu')) && t.some(x => /^ten (vat tu|dau mo)/.test(x)) && t.some(x => x.includes('thong so')), 15);
+  if (hi < 0) return null;
+  const S2 = (cells[hi + 1] || []).map(c => fold(ctext(c)).replace(/\s+/g, ' ').trim());
+  const col = (f, from = 0) => H.findIndex((x, i) => i >= from && f(x));
+  const C = {
+    bieu: col(x => x === 'bieu nguon'), stt: col(x => x === 'stt' || x === 'tt'), scd: col(x => x === 'scd' || x.startsWith('scd ')), pt2: col(x => x.includes('phu trach p2')),
+    ht1: col(x => x === 'he thong 1'), ht2: col(x => x === 'he thong 2'), ht3: col(x => x === 'he thong 3'), ht4: col(x => x === 'he thong 4'), ht5: col(x => x === 'he thong 5'),
+    tb: col(x => x === 'thiet bi'), tbc: col(x => x === 'thiet bi con'), code: col(x => x.includes('ma vat tu')), name: col(x => /^ten (vat tu|dau mo)/.test(x)),
+    spec: col(x => x.includes('thong so')), mahieu: col(x => x.includes('ma hieu') || x.includes('ky ma')), xx: col(x => x.includes('xuat xu') && !x.includes('ma hieu')),
+    ton: col(x => x === 'ton kho'), dg: col(x => x === 'don gia' || x === 'don gia (d)'), ccdg: col(x => x.startsWith('can cu don gia')), gc: col(x => x.startsWith('ghi chu')), dv: col(x => x.startsWith('don vi de xuat'))
+  };
+  C.unit = col(x => x === 'don vi' || x === 'don vi tinh' || x === 'dvt', Math.max(0, C.name));
+  C.qty = [x => x === 'kl de xuat 2027' || x === 'khoi luong de xuat 2027', x => /de xuat/.test(x) && x.includes('2027') && !/ tai /.test(x + ' '), x => /de xuat/.test(x) && x.includes('2027')].map(f => col(f)).find(i => i >= 0);
+  const uc = col(x => /(so luong|khoi luong) su dung/.test(x));
+  let ue = H.length; if (uc >= 0) for (let i = uc + 1; i < H.length; i++) if (H[i]) { ue = i; break; }
+  for (const y of [2023, 2024, 2025, 2026]) {
+    let i = col(x => x.includes('su dung') && x.includes(String(y)));
+    if (i < 0 && uc >= 0) for (let k = uc; k < ue; k++) if ((S2[k] || '').includes(String(y))) i = k;
+    C['s' + y] = i;
+  }
+  if (C.code < 0 || C.name < 0) return null;
+  const mats = [];
+  for (let r = hi + 1; r < cells.length; r++) {
+    const row = cells[r] || []; const g = k => C[k] >= 0 ? ctext(row[C[k]]) : ''; const n = k => C[k] >= 0 ? cnum(row[C[k]]) : NaN;
+    const code = g('code').replace(/\s+/g, ''), name = g('name');
+    if (!code && !name) continue;
+    if (!code && /^tong/.test(fold(name))) continue;
+    const m = { id: uid(), bieu: g('bieu') || sn, row: r + 1 };
+    ['stt', 'scd', 'pt2', 'ht1', 'ht2', 'ht3', 'ht4', 'ht5', 'tb', 'tbc', 'name', 'spec', 'mahieu', 'xx', 'unit', 'ccdg', 'gc', 'dv'].forEach(k => { m[k] = g(k); });
+    m.code = code;
+    ['s2023', 's2024', 's2025', 's2026', 'ton', 'dg'].forEach(k => { const v = n(k); m[k] = isFinite(v) ? v : null; });
+    const q = n('qty'); m.qty = isFinite(q) ? String(r4(q)) : '';
+    m.spec0 = m.spec; // thông số ban đầu để biết dòng nào đã sửa
+    mats.push(m);
+  }
+  return mats.length ? { sheet: sn, mats } : null;
+}
+function importVTPlan(wb, fname) {
+  let mats = []; const sheets = [];
+  wb.SheetNames.forEach((sn, i) => { const hid = wb.Workbook?.Sheets?.[i]?.Hidden; if (hid) return; const r = parseVTPlanSheet(wb.Sheets[sn], sn); if (r) { mats = mats.concat(r.mats); sheets.push(`${sn} (${r.mats.length})`); } });
+  if (!mats.length) return null;
+  const p = { id: uid(), kind: 'vt', name: 'Danh mục vật tư – ' + fname.replace(/\.xlsx?$/i, ''), loai: 'Danh mục vật tư', unit: '', year: (fname.match(/20\d\d/) || ['2027'])[0], created: new Date().toISOString(), hientrang: [], items: [], mats, src: fname };
+  S.projects.unshift(p); logH(p, null, 'Nhập danh mục vật tư từ file ' + fname, '', '', sheets.join('; '));
+  S.vtP = p.id; S.tab = 'vat-tu'; S.vtF = {}; S.vtPage = 1; location.hash = 'vat-tu'; persist();
+  return { n: mats.length, sheets };
+}
+// danh sách dòng vật tư của một đợt / danh mục
+function vtmRows(p) {
+  if (!p) return [];
+  if (p.kind === 'vt') return (p.mats || []).map(m => ({ key: 'm:' + m.id, sys: m.ht1 || '(Không ghi hệ thống)', sys2: m.ht2 || '', tb: [m.tb, m.tbc].filter(Boolean).join(' · '), hm: [m.ht3, m.ht4, m.ht5].filter(Boolean).join(' · '), v: m, bieu: m.bieu, dv: m.dv, lock: false }));
+  const T = buildTree(p); const gname = id => { const g = p.items.find(i => i.id === id); return g ? [g.stt, g.thietbi].filter(Boolean).join('. ') : ''; };
+  const out = [];
+  for (const it of p.items) {
+    if (it.type === 'group' || !(it.vt || []).length) continue;
+    const path = T.pathOf[it.id] || []; const st = hmSt(p, it);
+    it.vt.forEach((v, k) => out.push({ key: 'i:' + it.id + ':' + k, sys: path[0] ? gname(path[0]) : '(Chưa thuộc hệ thống)', sys2: path[1] ? gname(path[1]) : '', tb: it.thietbi || '', hm: [it.stt, it.cv].filter(Boolean).join(' · '), v, it, lock: !SRV.me.canEdit || !!(st && st.lock) }));
+  }
+  return out;
+}
+function vtmFilter(rows) {
+  const f = S.vtF || {}; let L = rows;
+  if (f.sys) L = L.filter(r => r.sys === f.sys);
+  if (f.bieu) L = L.filter(r => r.bieu === f.bieu);
+  if (f.dv) L = L.filter(r => (r.dv || '') === f.dv);
+  if (f.st) L = L.filter(r => vtStatus(r.v.code, evalKL(r.v.qty)).k === f.st);
+  if (f.nospec) L = L.filter(r => !String(r.v.spec || '').trim());
+  if (f.edited) L = L.filter(r => r.v.spec0 !== undefined && (r.v.spec || '') !== (r.v.spec0 || ''));
+  if (f.q) { const q = fold(f.q); L = L.filter(r => fold([r.v.code, r.v.name, r.v.spec, r.v.mahieu, r.tb, r.hm, r.sys2].join(' ')).includes(q)); }
+  return L;
+}
+const uniq = a => [...new Set(a.filter(Boolean))];
+function viewVTM() {
+  const p = vtmProj();
+  const projOpts = S.projects.map(x => `<option value="${x.id}" ${p && x.id === p.id ? 'selected' : ''}>${esc(x.kind === 'vt' ? '[Danh mục VT] ' : '[Đợt] ')}${esc(x.name)}</option>`).join('');
+  const head = `<section class="panel"><div class="panel-h" style="flex-wrap:wrap;gap:10px"><h2 class="grow">Rà soát vật tư</h2>
+      <select class="in" id="vtmP" style="width:auto;max-width:100%">${projOpts}</select>
+      ${SRV.local ? `<label class="btn sm pri file" title="Biểu PL1 kế hoạch vật tư (B4.1.2a.6.3, B4.1.2b, B4.1.2c, B4.1.2d…) hoặc file đã gộp 1 sheet">Nhập danh mục vật tư (.xlsx)<input type="file" accept=".xlsx,.xls" id="vtplanfile"></label>` : ''}
+      ${!S.inv ? `<button class="btn sm" data-act="goto" data-tab="ton-kho">Nạp tồn kho để đối chiếu</button>` : ''}</div>
+    <div class="panel-b hint">Rà thông số kỹ thuật, mã hiệu, xuất xứ, khối lượng để mời thầu và đối chiếu tồn kho. ${p && p.kind !== 'vt' ? 'Đây là vật tư của các hạng mục trong đợt: sửa ở đây là sửa luôn trong hạng mục, phương án xuất ra dùng số liệu mới.' : 'Danh mục vật tư kế hoạch (không có nhân công). Dòng đã đổi thông số so với file gốc được đánh dấu.'}</div></section>`;
+  if (!p) return `<div class="view">${head}<section class="panel"><div class="empty"><b>Chưa có dữ liệu</b>Nhập danh mục vật tư hoặc tạo đợt tiểu tu trước.</div></section></div>`;
+  const all = vtmRows(p); const L = vtmFilter(all); const f = S.vtF || {};
+  const isVT = p.kind === 'vt';
+  const sysL = uniq(all.map(r => r.sys)); const bieuL = uniq(all.map(r => r.bieu)); const dvL = uniq(all.map(r => r.dv));
+  const cnt = { moi: 0, thieu: 0, du: 0, ngoai: 0 }; let money = 0, nospec = 0, edited = 0;
+  all.forEach(r => { const s = vtStatus(r.v.code, evalKL(r.v.qty)).k; if (s in cnt) cnt[s]++; if (isVT) money += evalKL(r.v.qty) * (Number(r.v.dg) || 0); if (!String(r.v.spec || '').trim()) nospec++; if (r.v.spec0 !== undefined && (r.v.spec || '') !== (r.v.spec0 || '')) edited++; });
+  const PG = 200; const pages = Math.max(1, Math.ceil(L.length / PG)); S.vtPage = Math.min(S.vtPage || 1, pages);
+  const show = L.slice((S.vtPage - 1) * PG, S.vtPage * PG);
+  const inp = (r, f2, val, cls = '', ta = false) => ta
+    ? `<textarea class="in small vtspec ${cls}" data-vm="${esc(r.key)}|${f2}" rows="${Math.min(5, Math.max(2, String(val || '').split('\n').length))}" ${r.lock ? 'disabled' : ''}>${esc(val || '')}</textarea>`
+    : `<input class="in small ${cls}" data-vm="${esc(r.key)}|${f2}" value="${esc(val ?? '')}" ${r.lock ? 'disabled' : ''}>`;
+  let lastSys = null;
+  const rows = show.map(r => {
+    const s = vtStatus(r.v.code, evalKL(r.v.qty)); const iv = invItem(r.v.code);
+    const chg = r.v.spec0 !== undefined && (r.v.spec || '') !== (r.v.spec0 || '');
+    const grp = r.sys !== lastSys ? `<tr class="grp"><td colspan="${isVT ? 12 : 11}"><b>${esc(r.sys)}</b></td></tr>` : ''; lastSys = r.sys;
+    return grp + `<tr>
+      <td class="small" style="min-width:150px">${esc(r.sys2)}${r.tb ? `<div class="sub">${esc(r.tb)}</div>` : ''}${r.hm ? `<div class="sub">${esc(r.hm)}</div>` : ''}${isVT ? `<div class="sub muted">${esc(r.bieu)}${r.v.stt ? ' · STT ' + esc(r.v.stt) : ''}</div>` : ''}</td>
+      <td style="min-width:200px">${inp(r, 'vtcode', r.v.code, 'mono')}</td>
+      <td style="min-width:170px">${inp(r, 'vtname', r.v.name, '', true)}</td>
+      <td style="min-width:260px">${inp(r, 'spec', r.v.spec, chg ? 'edited' : '', true)}${chg ? `<div class="sub" title="${esc(r.v.spec0 || '')}" style="color:var(--warn)">đã sửa so với file gốc</div>` : ''}</td>
+      <td style="min-width:140px">${inp(r, 'mahieu', r.v.mahieu, '', true)}</td>
+      ${isVT ? `<td style="min-width:90px">${inp(r, 'xx', r.v.xx)}</td>` : ''}
+      <td style="min-width:70px">${inp(r, 'unit', r.v.unit)}</td>
+      <td style="min-width:90px">${inp(r, 'qty', r.v.qty, 'mono num')}</td>
+      ${isVT ? `<td style="min-width:120px">${inp(r, 'dg', r.v.dg ?? '', 'mono num')}</td>` : ''}
+      <td class="num">${iv ? fmt(iv.s, 3) : '–'}${iv && iv.s ? `<div class="sub">${fmt(iv.v / iv.s, 0)} đ</div>` : ''}</td>
+      <td><span class="pill ${s.c}">${s.t}</span>${!iv && r.v.code ? similarInvHTML(r.v.code) : ''}</td>
+      ${isVT ? `<td style="min-width:160px">${inp(r, 'gc', r.v.gc, '', true)}</td>` : `<td class="small">${r.lock ? '<span class="pill p-mute">Khoá</span>' : ''}</td>`}
+    </tr>`;
+  }).join('');
+  const sel = (id, label, list, cur) => `<label class="fl" style="flex-direction:row;gap:6px;align-items:center"><span>${label}</span><select class="in" id="${id}" style="width:auto;max-width:260px"><option value="">Tất cả</option>${list.map(x => `<option ${x === cur ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></label>`;
+  return `<div class="view">${head}
+    <section class="panel" style="min-width:0">
+      <div class="sum">
+        <div><div class="k">Dòng vật tư</div><div class="v">${fmt(all.length, 0)}</div></div>
+        ${isVT ? `<div><div class="k">Giá trị (KL × đơn giá)</div><div class="v">${fmt(money, 0)} <small>đ</small></div></div>` : ''}
+        <div><div class="k">Chưa có thông số</div><div class="v">${nospec}</div></div>
+        ${isVT ? `<div><div class="k">Đã sửa thông số</div><div class="v">${edited}</div></div>` : ''}
+        <div class="cut"><div class="k">Cần mua / bổ sung</div><div class="v">${S.inv ? cnt.moi + cnt.thieu + cnt.ngoai : '–'} <small>${S.inv ? `mới ${cnt.moi} · thiếu ${cnt.thieu} · ngoài DM ${cnt.ngoai}` : 'chưa nạp tồn kho'}</small></div></div>
+      </div>
+      <div class="fbar" style="flex-wrap:wrap;gap:10px">
+        ${sel('vtmSys', 'Hệ thống', sysL, f.sys)}
+        ${isVT && bieuL.length > 1 ? sel('vtmBieu', 'Biểu', bieuL, f.bieu) : ''}
+        ${isVT && dvL.length ? sel('vtmDv', 'ĐV đề xuất', dvL, f.dv) : ''}
+        <label class="fl" style="flex-direction:row;gap:6px;align-items:center"><span>Tồn kho</span><select class="in" id="vtmSt" style="width:auto"><option value="">Tất cả</option>${Object.entries(VTM_ST).filter(([k]) => k !== 'na').map(([k, t]) => `<option value="${k}" ${f.st === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+        <label style="display:flex;gap:6px;align-items:center" class="small"><input type="checkbox" id="vtmNo" ${f.nospec ? 'checked' : ''}> Chưa có thông số</label>
+        ${isVT ? `<label style="display:flex;gap:6px;align-items:center" class="small"><input type="checkbox" id="vtmEd" ${f.edited ? 'checked' : ''}> Đã sửa thông số</label>` : ''}
+        <input class="in" id="vtmQ" style="width:min(280px,100%)" value="${esc(f.q || '')}" placeholder="Tìm mã, tên, thông số, thiết bị…" autocomplete="off">
+        <span class="grow"></span>
+        <button class="btn sm pri" data-act="vtm-exp">Xuất Excel…</button>
+        ${isVT ? `<button class="btn sm ghost danger" data-act="vtm-del">Xoá danh mục</button>` : `<button class="btn sm" data-act="openp" data-id="${p.id}">Mở đợt / xuất phương án →</button>`}
+      </div>
+      ${S.confirm === 'vtdel:' + p.id ? `<div class="panel-b"><span class="confirm">Xoá danh mục vật tư này? <button class="btn sm danger" data-act="vtm-del-yes">Xoá</button><button class="btn sm" data-act="cancel">Không</button></span></div>` : ''}
+      <div class="hint" style="padding:6px 14px">${L.length} / ${all.length} dòng${pages > 1 ? ` · trang ${S.vtPage}/${pages} <button class="btn sm" data-act="vtm-pg" data-d="-1" ${S.vtPage > 1 ? '' : 'disabled'}>‹ Trước</button> <button class="btn sm" data-act="vtm-pg" data-d="1" ${S.vtPage < pages ? '' : 'disabled'}>Sau ›</button>` : ''}</div>
+      ${L.length ? `<div class="tbox"><table class="vtm"><thead><tr><th>${isVT ? 'Hệ thống / thiết bị' : 'Hệ thống / hạng mục'}</th><th>Mã vật tư</th><th>Tên vật tư</th><th>Thông số kỹ thuật</th><th>Mã hiệu / hãng SX</th>${isVT ? '<th>Xuất xứ</th>' : ''}<th>ĐVT</th><th class="num">${isVT ? 'KL 2027' : 'Khối lượng'}</th>${isVT ? '<th class="num">Đơn giá</th>' : ''}<th class="num">Tồn kho</th><th>Tình trạng</th><th>${isVT ? 'Ghi chú' : ''}</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="empty">${all.length ? 'Không có dòng nào khớp bộ lọc.' : 'Đợt này chưa có vật tư.'}</div>`}
+    </section>${vtmModal(p, all, L)}${modalsHTML(curP())}</div>`;
+}
+function vtmModal(p, all, L) {
+  if (!S.vtExp) return '';
+  const sys = uniq(all.map(r => r.sys)); const chosen = S.vtExpSys || new Set(sys);
+  return `<div class="modal-bg"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="vteh"><h2 id="vteh" style="font-size:16px">Xuất danh mục vật tư</h2>
+    <p class="muted small" style="margin:0">Chọn hệ thống cần xuất. ${p.kind === 'vt' ? 'File theo đúng cột của biểu gộp, kèm tồn kho từ file kho đã nạp.' : 'Danh sách vật tư theo hạng mục của đợt, kèm tồn kho.'}</p>
+    <div style="display:flex;gap:8px"><button class="btn sm" data-act="vtm-all" data-v="1">Chọn tất cả</button><button class="btn sm" data-act="vtm-all" data-v="0">Bỏ chọn</button></div>
+    <div style="max-height:46vh;overflow:auto;display:grid;gap:4px;border:1px solid var(--line2);border-radius:var(--r);padding:8px">${sys.map(x => `<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" class="vtm-sys" value="${esc(x)}" ${chosen.has(x) ? 'checked' : ''}> ${esc(x)} <span class="muted small">(${all.filter(r => r.sys === x).length})</span></label>`).join('')}</div>
+    <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="vtmOnlyF"> Chỉ xuất các dòng đang lọc (${L.length} dòng)</label>
+    <div class="btns"><button class="btn pri" data-act="vtm-doexp">Xuất file</button><button class="btn" data-act="vtm-expclose">Huỷ</button></div></div></div>`;
+}
+async function vtmExport(p, rows, sysLabel) {
+  const wb = new ExcelJS.Workbook(); const ws = wb.addWorksheet(p.kind === 'vt' ? 'Tổng hợp' : 'Vật tư');
+  const HF = 'FF1F4E79'; const GF = 'FFDDEBF7';
+  const isVT = p.kind === 'vt';
+  const H = isVT ? ['Biểu nguồn', 'STT', 'SCĐ', 'Hệ thống 1', 'Hệ thống 2', 'Hệ thống 3', 'Hệ thống 4', 'Hệ thống 5', 'Thiết bị', 'Thiết bị con', 'Mã vật tư', 'Tên vật tư', 'Thông số kỹ thuật', 'Mã hiệu / Hãng SX', 'Xuất xứ', 'ĐVT', 'SL sử dụng 2023', 'SL sử dụng 2024', 'SL sử dụng 2025', 'SL sử dụng 2026', 'Tồn kho (biểu)', 'KL đề xuất 2027', 'Đơn giá (đ)', 'Thành tiền (đ)', 'Căn cứ đơn giá', 'Ghi chú', 'Đơn vị đề xuất', 'Phụ trách P2', 'Tồn kho (file kho)', 'Tình trạng', 'Thông số ban đầu (nếu đã sửa)']
+    : ['Hệ thống', 'Hệ thống con', 'STT hạng mục', 'Công việc', 'Thiết bị', 'Mã vật tư', 'Tên vật tư', 'Thông số kỹ thuật', 'Mã hiệu / Hãng SX', 'ĐVT', 'Khối lượng', 'Tồn kho (file kho)', 'Tình trạng'];
+  const W = isVT ? [16, 7, 11, 16, 16, 16, 12, 12, 20, 16, 22, 28, 44, 22, 12, 8, 10, 10, 10, 10, 10, 12, 14, 16, 26, 36, 12, 12, 12, 16, 40] : [26, 26, 10, 36, 24, 22, 28, 44, 22, 8, 12, 12, 16];
+  ws.columns = W.map(w => ({ width: w }));
+  ws.getCell('A1').value = (isVT ? 'DANH MỤC VẬT TƯ ' : 'VẬT TƯ ') + p.name.toUpperCase(); ws.getCell('A1').font = { name: 'Times New Roman', size: 14, bold: true };
+  ws.getCell('A2').value = `Xuất ngày ${new Date().toLocaleDateString('vi-VN')}${sysLabel ? ' · Hệ thống: ' + sysLabel : ''}${S.inv ? ' · Tồn kho theo file ' + S.inv.meta.file : ''}`; ws.getCell('A2').font = { name: 'Times New Roman', size: 10, italic: true };
+  xlRow(ws, 4, H, H.length, { bold: true, center: true, vmid: true, fill: HF, color: Object.fromEntries(H.map((_, i) => [i + 1, 'FFFFFFFF'])) });
+  ws.getRow(4).height = 42; ws.views = [{ state: 'frozen', ySplit: 4, xSplit: isVT ? 12 : 7 }];
+  let r = 5; let last = null;
+  for (const x of rows) {
+    if (x.sys !== last) { last = x.sys; const g = new Array(H.length).fill(''); g[0] = x.sys; xlRow(ws, r++, g, H.length, { bold: true, fill: GF }); }
+    const v = x.v; const s = vtStatus(v.code, evalKL(v.qty)); const iv = invItem(v.code); const q = evalKL(v.qty);
+    if (isVT) {
+      const chg = v.spec0 !== undefined && (v.spec || '') !== (v.spec0 || '');
+      xlRow(ws, r, [v.bieu, v.stt, v.scd, v.ht1, v.ht2, v.ht3, v.ht4, v.ht5, v.tb, v.tbc, v.code, v.name, v.spec, v.mahieu, v.xx, v.unit, v.s2023, v.s2024, v.s2025, v.s2026, v.ton, q || null, Number(v.dg) || null, null, v.ccdg, v.gc, v.dv, v.pt2, iv ? iv.s : null, s.t, chg ? v.spec0 : ''], H.length, { size: 11, numFmt: { 17: '#,##0.###', 18: '#,##0.###', 19: '#,##0.###', 20: '#,##0.###', 21: '#,##0.###', 22: '#,##0.###', 23: '#,##0', 24: '#,##0', 29: '#,##0.###' } });
+      if (q && Number(v.dg)) ws.getCell(r, 24).value = { formula: `V${r}*W${r}`, result: q * Number(v.dg) };
+      if (chg) ws.getCell(r, 13).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
+    } else {
+      xlRow(ws, r, [x.sys, x.sys2, x.it.stt, x.it.cv, x.tb, v.code, v.name, v.spec, v.mahieu, v.unit, q || null, iv ? iv.s : null, s.t], H.length, { size: 11, numFmt: { 11: '#,##0.###', 12: '#,##0.###' } });
+    }
+    r++;
+  }
+  if (isVT) { const t = new Array(H.length).fill(''); t[0] = 'TỔNG CỘNG'; xlRow(ws, r, t, H.length, { bold: true, fill: 'FFFFF2CC' }); ws.getCell(r, 24).value = { formula: `SUM(X5:X${r - 1})` }; ws.getCell(r, 24).numFmt = '#,##0'; }
+  ws.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4, column: H.length } };
+  await xlSave(wb, (isVT ? 'Danh muc vat tu - ' : 'Vat tu - ') + p.name.replace(/[\\/:*?"<>|]/g, '-') + (sysLabel && sysLabel.length < 60 ? ' - ' + sysLabel.replace(/[\\/:*?"<>|]/g, '-') : '') + '.xlsx');
+}
+function vtmSet(key, field, val) {
+  const p = vtmProj(); const [kind, a, b] = key.split(':');
+  let obj, target;
+  if (kind === 'm') { obj = (p.mats || []).find(m => m.id === a); target = obj ? { id: obj.id, stt: obj.stt || '', code: obj.code || '' } : null; }
+  else { const it = p.items.find(i => i.id === a); obj = it && it.vt ? it.vt[+b] : null; target = it; }
+  if (!obj) return false;
+  const k = field === 'vtcode' ? 'code' : field === 'vtname' ? 'name' : field;
+  const old = obj[k] == null ? '' : String(obj[k]); const nv = k === 'dg' ? (val === '' ? null : (isFinite(+String(val).replace(/\./g, '').replace(',', '.')) ? +String(val).replace(/\./g, '').replace(',', '.') : old)) : val;
+  if (String(nv ?? '') === old) return false;
+  obj[k] = nv; if (k === 'code') obj.code = String(nv).trim();
+  logH(p, target, 'Rà soát vật tư' + (obj.name ? ': ' + String(obj.name).slice(0, 40) : ''), field, old, nv);
+  persist(); return true;
+}
+// chọn hệ thống khi xuất phương án
+function expSysHTML(p) {
+  const T = buildTree(p); if (!T.roots.length) return '';
+  const ch = S.expSys; const on = id => !ch || ch.has(id);
+  return `<div class="fl"><span>Hệ thống xuất (bỏ chọn hệ thống không cần)</span><div style="max-height:30vh;overflow:auto;border:1px solid var(--line2);border-radius:var(--r);padding:8px;display:grid;gap:3px">
+    ${T.roots.map(a => `<label style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" class="exps" data-l="1" value="${a.id}" ${on(a.id) ? 'checked' : ''}> ${esc(a.it.stt)}. ${esc(a.it.thietbi)}</label>${a.kids.map(b => `<label style="display:flex;gap:8px;align-items:center;padding-left:24px"><input type="checkbox" class="exps" data-p="${a.id}" value="${b.id}" ${on(b.id) ? 'checked' : ''}> ${esc(b.it.stt)}. ${esc(b.it.thietbi)}</label>`).join('')}`).join('')}</div>
+    <div style="display:flex;gap:8px;margin-top:4px"><button class="btn sm" type="button" data-act="exps-all" data-v="1">Chọn tất cả</button><button class="btn sm" type="button" data-act="exps-all" data-v="0">Bỏ chọn tất cả</button></div></div>`;
+}
+function expSysItems(p, IT) {
+  const boxes = [...document.querySelectorAll('.exps')]; if (!boxes.length) return { IT, label: '' };
+  const on = new Set(boxes.filter(b => b.checked).map(b => b.value)); if (on.size === boxes.length) return { IT, label: '' };
+  const T = buildTree(p); const keepRoot = new Set();
+  T.roots.forEach(a => { if (on.has(a.id) || a.kids.some(b => on.has(b.id))) keepRoot.add(a.id); });
+  const ok = it => {
+    const path = T.pathOf[it.id] || [];
+    if (it.type === 'group' && keepRoot.has(it.id)) return true;
+    if (!path.length) return false;
+    const root = path[0], sub = path[1];
+    const rootNode = T.roots.find(a => a.id === root);
+    if (rootNode && rootNode.kids.length) { if (it.type === 'group' && rootNode.kids.some(b => b.id === it.id)) return on.has(it.id); return sub ? on.has(sub) : on.has(root); }
+    return on.has(root);
+  };
+  const lbl = T.roots.flatMap(a => (on.has(a.id) && a.kids.every(b => on.has(b.id))) || (on.has(a.id) && !a.kids.length) ? [a.it.stt] : a.kids.filter(b => on.has(b.id)).map(b => a.it.stt + '.' + b.it.stt)).join(', ');
+  return { IT: IT.filter(ok), label: 'Hệ thống ' + lbl };
+}
+
 /* ---------- events ---------- */
 function findItem(id) { const p = curP(); return p ? p.items.find(i => i.id === id) : null; }
 let lastOpen = null;
@@ -1479,6 +1711,18 @@ document.addEventListener('click', e => {
       const g = findItem(S.ptAssign); if (!g) break; const vals = {}; PT_ROLES.forEach(([f]) => { if (canPt(f, g)) vals[f] = S.paVals[f] || ''; });
       const r = applyPt(p, g, vals, !!$('#pa-ov')?.checked); S.ptAssign = null; persist(); render();
       toast(`Đã giao phụ trách cho ${g.stt}. ${g.thietbi}: cập nhật ${r.n} hạng mục${r.skip ? `; ${r.skip} hạng mục thuộc PX khác giữ nguyên` : ''}`); break; }
+    case 'vtm-del': S.confirm = 'vtdel:' + vtmProj().id; render(); break;
+    case 'vtm-del-yes': { const pv = vtmProj(); S.projects = S.projects.filter(x => x.id !== pv.id); S.vtP = null; S.confirm = null; persist(); render(); toast('Đã xoá danh mục vật tư'); break; }
+    case 'vtm-pg': S.vtPage = (S.vtPage || 1) + (+b.dataset.d); render(); window.scrollTo(0, 0); break;
+    case 'vtm-exp': S.vtExp = true; render(); break;
+    case 'vtm-expclose': S.vtExp = false; render(); break;
+    case 'vtm-all': $$('.vtm-sys').forEach(c => c.checked = b.dataset.v === '1'); break;
+    case 'vtm-doexp': {
+      const pv = vtmProj(); const all = vtmRows(pv); const onlyF = $('#vtmOnlyF')?.checked; const chosen = new Set($$('.vtm-sys').filter(c => c.checked).map(c => c.value));
+      S.vtExpSys = chosen; if (!chosen.size) { toast('Chọn ít nhất một hệ thống'); break; }
+      const rows = (onlyF ? vtmFilter(all) : all).filter(r => chosen.has(r.sys)); const sysAll = uniq(all.map(r => r.sys));
+      S.vtExp = false; render(); vtmExport(pv, rows, chosen.size === sysAll.length ? '' : [...chosen].join('; ')).catch(err => toast('Lỗi xuất file: ' + (err.message || err))); break; }
+    case 'exps-all': $$('.exps').forEach(c => c.checked = b.dataset.v === '1'); break;
     case 'grppx': {
       const g = findItem(b.dataset.id); const cq = $('#gcq-' + g.id)?.value || '', sc = $('#gsc-' + g.id)?.value || '';
       if (!cq && !sc) { toast('Chọn đơn vị để gán'); break; }
@@ -1511,7 +1755,7 @@ document.addEventListener('click', e => {
     case 'ht2item': { const h = p.hientrang.find(x => x.id === b.dataset.id); logH(p, null, 'Tạo hạng mục từ hiện trạng', '', '', [h.stt, h.thietbi].filter(Boolean).join(' · ')); const it = { id: uid(), type: 'dm', stt: h.stt, thietbi: h.thietbi, code: '', cv: h.dexuat || '', unit: '', klExpr: '1', removed: [], nManual: null, note: '', ht: [h.id], vt: [] }; p.items.push(it); S.sub = 'hang-muc'; S.open = it.id; persist(); render(); setTimeout(() => { const row = $(`tr[data-id="${it.id}"]`); row && row.scrollIntoView({ block: 'nearest' }); const q = $('#codeq-' + it.id); if (q) { q.value = h.dexuat || h.thietbi || ''; q.focus(); q.dispatchEvent(new Event('input', { bubbles: true })); } }, 30); break; }
     case 'export': S.expOpen = true; render(); break;
     case 'expclose': S.expOpen = false; render(); break;
-    case 'doexport': { const m = $('input[name="expm"]:checked')?.value || 'tach'; S.expMode = m; S.expExtra = $('#expx')?.checked !== false; S.expCong = !!$('#expc')?.checked; const onlyF = filterOn() && $('#expf')?.checked; const IT = onlyF ? visibleItems(p) : p.items; const fl = onlyF ? filterLabel(p) : ''; S.expOpen = false; render(); exportProject(p, m, S.expExtra, S.expCong, IT, fl).catch(err => toast('Lỗi xuất file: ' + (err.message || err))); break; }
+    case 'doexport': { const m = $('input[name="expm"]:checked')?.value || 'tach'; S.expMode = m; S.expExtra = $('#expx')?.checked !== false; S.expCong = !!$('#expc')?.checked; const onlyF = filterOn() && $('#expf')?.checked; const ES = expSysItems(p, onlyF ? visibleItems(p) : p.items); const IT = ES.IT; const fl = [onlyF ? filterLabel(p) : '', ES.label].filter(Boolean).join(' — '); if (!IT.some(i => i.type !== 'group')) { toast('Chưa chọn hệ thống nào có hạng mục'); break; } S.expOpen = false; render(); exportProject(p, m, S.expExtra, S.expCong, IT, fl).catch(err => toast('Lỗi xuất file: ' + (err.message || err))); break; }
     case 'node': S.node = b.dataset.node || null; S.open = null; render(); { const tb = $('.tbox'); if (tb) tb.scrollTop = 0; } break;
     case 'clearf': S.pt = ''; if (S.view === 'detail') S.node = null; try { localStorage.setItem('klsc-pt', ''); } catch (e) { } render(); break;
     case 'nav': { const VI = visibleItems(p); const i = VI.findIndex(x => x.id === S.open) + (+b.dataset.d); if (VI[i]) { S.open = VI[i].id; S.confirm = null; rerenderKeepScroll(); const row = $(`tr[data-id="${S.open}"]`); row && row.scrollIntoView({ block: 'nearest' }); } break; }
@@ -1532,7 +1776,9 @@ document.addEventListener('click', e => {
       toast(done.length ? 'Đã xoá: ' + done.join(', ') : 'Chưa chọn mục nào để xoá'); break; }
     case 'convclose': S.convOpen = false; render(); break;
     case 'doconv': { const m = $('input[name="convm"]:checked')?.value || 'new'; const pid = $('#convp')?.value; S.convPx = { cq: $('#convcq')?.value || '', sc: $('#convsc')?.value || '' }; S.convOpen = false; cmpToProject(m, pid); break; }
-    case 'openp': S.cur = b.dataset.id; S.view = 'overview'; S.node = null; S.open = null; S.confirm = null; render(); window.scrollTo(0, 0); break;
+    case 'openp': if ((S.projects.find(x => x.id === b.dataset.id) || {}).kind === 'vt') { S.vtP = b.dataset.id; S.tab = 'vat-tu'; location.hash = 'vat-tu'; render(); window.scrollTo(0, 0); break; }
+      if (S.tab === 'vat-tu') { S.tab = 'phuong-an'; location.hash = 'phuong-an'; }
+      S.cur = b.dataset.id; S.view = 'overview'; S.node = null; S.open = null; S.confirm = null; render(); window.scrollTo(0, 0); break;
     case 'home': S.view = 'home'; S.open = null; render(); window.scrollTo(0, 0); break;
     case 'overview': S.view = 'overview'; S.open = null; render(); window.scrollTo(0, 0); break;
     case 'opennode': S.view = 'detail'; S.sub = 'hang-muc'; S.node = b.dataset.node || null; S.open = null; render(); window.scrollTo(0, 0); break;
@@ -1573,6 +1819,10 @@ document.addEventListener('change', async e => {
     if (!n && !skip) return;
     persist(); setTimeout(rerenderKeepScroll, 0); toast(`Đã cập nhật thông số cho ${n} dòng vật tư${skip ? `; ${skip} hạng mục đang khoá không đổi` : ''}`); return;
   }
+  if (el.matches('[data-vm]')) { const [key, fld] = el.dataset.vm.split('|'); if (vtmSet(key, fld, el.value) && ['vtcode', 'qty', 'dg'].includes(fld)) setTimeout(rerenderKeepScroll, 0); return; }
+  if (el.id === 'vtmP') { S.vtP = el.value; S.vtF = {}; S.vtPage = 1; S.vtExpSys = null; render(); return; }
+  if (['vtmSys', 'vtmBieu', 'vtmDv', 'vtmSt'].includes(el.id)) { S.vtF = S.vtF || {}; S.vtF[{ vtmSys: 'sys', vtmBieu: 'bieu', vtmDv: 'dv', vtmSt: 'st' }[el.id]] = el.value; S.vtPage = 1; render(); return; }
+  if (el.id === 'vtmNo' || el.id === 'vtmEd') { S.vtF = S.vtF || {}; S.vtF[el.id === 'vtmNo' ? 'nospec' : 'edited'] = el.checked; S.vtPage = 1; render(); return; }
   if (el.id === 'ptrole') { S.ptRole = el.value; S.open = null; render(); return; }
   if (el.id === 'ptsel') { S.pt = el.value; S.open = null; try { localStorage.setItem('klsc-pt', S.pt); } catch (e) { } render(); return; }
   if (el.type === 'file' && el.files[0]) {
@@ -1585,6 +1835,7 @@ document.addEventListener('change', async e => {
       }
       const wb = XLSX.read(await f.arrayBuffer(), { type: 'array', cellFormula: true, cellDates: false });
       if (el.id === 'invfile') { const inv = parseInventory(wb, f.name); if (!inv) throw new Error('Không tìm thấy cột "Mã VT" và "Tồn cuối" trong file'); S.inv = inv; buildInvIndex(); await kv.set('inv', inv); render(); toast(`Đã nạp ${fmt(inv.meta.codes, 0)} mã vật tư`); }
+      else if (el.id === 'vtplanfile') { const r = importVTPlan(wb, f.name); if (!r) throw new Error('Không tìm thấy bảng có cột "Mã vật tư", "Tên vật tư", "Thông số kỹ thuật"'); render(); toast(`Đã nhập ${fmt(r.n, 0)} dòng vật tư từ ${r.sheets.length} biểu: ${r.sheets.join(', ')}`); }
       else if (el.id === 'cmpfile') {
         let dg = null; for (const sn of wb.SheetNames) { const m = parseDGSheet(wb.Sheets[sn]); if (m && Object.keys(m).length) { dg = m; break; } }
         const sheets = [];
@@ -1696,6 +1947,7 @@ document.addEventListener('input', e => {
   const el = e.target; const p = curP();
   if (el.id === 'dmq') { S.dmQ = el.value; const pos = el.selectionStart; render(); const q = $('#dmq'); q.focus(); q.setSelectionRange(pos, pos); return; }
   if (el.id === 'invq') { S.invQ = el.value; const pos = el.selectionStart; render(); const q = $('#invq'); q.focus(); q.setSelectionRange(pos, pos); return; }
+  if (el.id === 'vtmQ') { S.vtF = S.vtF || {}; S.vtF.q = el.value; S.vtPage = 1; const pos = el.selectionStart; render(); const q = $('#vtmQ'); q.focus(); q.setSelectionRange(pos, pos); return; }
   if (el.id === 'hq') { S.hq = el.value; const pos = el.selectionStart; render(); const q = $('#hq'); q.focus(); q.setSelectionRange(pos, pos); return; }
   if (el.dataset.pf) { p[el.dataset.pf] = el.value; persist(); return; }
   if (el.dataset.hf) { const h = p.hientrang.find(x => x.id === el.closest('[data-ht]').dataset.ht); h[el.dataset.hf] = el.value; persist(); return; }
@@ -1730,11 +1982,11 @@ document.addEventListener('focusout', e => {
   if (e.target.matches('[data-f="codeq"]')) setTimeout(() => { const l = e.target.parentElement?.querySelector('.aclist'); if (l && !l.contains(document.activeElement)) { /* keep list until click elsewhere */ } }, 0);
 });
 $$('.tab').forEach(b => b.addEventListener('click', () => { if (b.dataset.tab === 'phuong-an' && S.tab === 'phuong-an') { S.view = 'home'; S.open = null; } S.tab = b.dataset.tab; location.hash = S.tab; render(); }));
-window.addEventListener('hashchange', () => { const h = location.hash.slice(1); if (['phuong-an', 'doi-chieu', 'dinh-muc', 'ton-kho'].includes(h) && h !== S.tab) { S.tab = h; render(); } });
+window.addEventListener('hashchange', () => { const h = location.hash.slice(1); if (['phuong-an', 'vat-tu', 'doi-chieu', 'dinh-muc', 'ton-kho'].includes(h) && h !== S.tab) { S.tab = h; render(); } });
 
 /* ---------- boot ---------- */
 async function boot() {
-  const h = location.hash.slice(1); if (['phuong-an', 'doi-chieu', 'dinh-muc', 'ton-kho'].includes(h)) S.tab = h;
+  const h = location.hash.slice(1); if (['phuong-an', 'vat-tu', 'doi-chieu', 'dinh-muc', 'ton-kho'].includes(h)) S.tab = h;
   try { S.pt = localStorage.getItem('klsc-pt') || ''; S.user = localStorage.getItem('klsc-user') || ''; } catch (e) { }
   render();
   try {
